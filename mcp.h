@@ -23,11 +23,7 @@
 #define MCP_CMD_GET_READ_STATUS   0xA0
 #define MCP_CMD_GET_RX_STATUS     0xB0
 
-/* Adressen der Register des MCP2515
- *
- * Die Redundanten Adressen of z.B. dem Register CANSTAT 
- * (0x0E, 0x1E, 0x2E, ...) wurden dabei nicht mit aufgelistet.
- */
+/* MCP2515 register adresses  */
 #define RXF0SIDH    0x00
 #define RXF0SIDL    0x01
 #define RXF0EID8    0x02
@@ -297,6 +293,7 @@ typedef struct mcp_buffer {
     uint8_t eid0;
     uint8_t dlc;
     uint8_t d[8];
+
 } mcp_buffer_t;
 
 void spi_init(void);
