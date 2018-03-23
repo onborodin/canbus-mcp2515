@@ -55,8 +55,10 @@ ISR(USART_RX_vect) {
 /* Timer0 */
 void timer0_init(void) {
 
-    /* Set clock to 1/256 */
+    /* Set clock to 1/64 */
+    regbit_set_up(TCCR0B, CS00);
     regbit_set_up(TCCR0B, CS01);
+
     /* Enable interrupt */
     regbit_set_up(TIMSK0,TOIE0);
 
@@ -122,8 +124,6 @@ uint8_t spi_read_byte(void) {
     while (!(SPSR & (1 << SPIF)));
     return SPDR;
 }
-
-
 
 #define spi_select_mcp()   regbit_set_down(PORTB, PIN_SS)
 #define spi_unselect_mcp() regbit_set_up(PORTB, PIN_SS)
@@ -265,9 +265,9 @@ void mcp_set_mode(uint8_t mode) {
  */
 
 typedef struct can_msg {
-    uint32_t id : 29;
-    uint32_t priority : 2;
-    uint8_t length : 4;
+    uint32_t id;
+    uint32_t priority;
+    uint8_t length;
     uint8_t data[8];
 } can_msg_t;
 
@@ -291,6 +291,26 @@ void mcp_pack_msg(can_msg_t *msg, mcp_buffer_t *buffer) {
     buffer->dlc = (uint8_t)(msg->length) & 0x0F;
 
 }
+
+void mcp_unpack_msg(mcp_buffer_t *buffer, can_msg_t *msg) {
+    #define EXT_MSG 1
+    #if EXT_MSG
+    msg->id =  (uint32_t)(buffer->sidh) << 3;
+    msg->id |= (uint32_t)(buffer->sidl) >> 5;
+    msg->id |= (uint32_t)(buffer->eid8) << 19;
+    msg->id |= (uint32_t)(buffer->eid0) << 11;
+    #else
+    msg->id =  (uint32_t)(buffer->sidh) << 3;
+    msg->id |= (uint32_t)(buffer->sidl) >> 5;
+    #endif
+
+    for (uint8_t i = 0; i < msg->length; i++) 
+        msg->data[i] = buffer->d[i];
+
+    msg->length = (buffer->dlc) & 0x0F;
+}
+
+
 
 #define TX_BUF_COUNT 3
 
@@ -356,9 +376,7 @@ bool mcp_send_msg(can_msg_t *msg) {
 
     mcp_set_tx(msg, tx);
     mcp_pack_msg(msg, &buffer);
-
     mcp_print_buffer(&buffer);
-
     mcp_load_tx(&buffer, tx);
     mcp_rts(tx);
 
@@ -404,29 +422,34 @@ void mcp_print_bit(uint8_t *descr, uint8_t byte, uint8_t bit) {
 void mcp_print_status (void) {
     uint8_t data = mcp_read_status();
 
-    mcp_print_bit("CANINTF.RX0IF", data, 0);
-    mcp_print_bit("CANINTFL.RX1IF", data, 1);
-    mcp_print_bit("TXB0CNTRL.TXREQ", data, 2);
-    mcp_print_bit("CANINTF.TX0IF", data, 3);
-    mcp_print_bit("TXB1CNTRL.TXREQ", data, 4);
-    mcp_print_bit("CANINTF.TX1IF", data, 5);
-    mcp_print_bit("TXB2CNTRL.TXREQ", data, 6);
-    mcp_print_bit("CANINTF.TX2IF", data, 7);
+    mcp_print_bit("CANINTF.RX0IF   ", data, 0);
+    mcp_print_bit("CANINTFL.RX1IF  ", data, 1);
+    mcp_print_bit("TXB0CNTRL.TXREQ ", data, 2);
+    mcp_print_bit("CANINTF.TX0IF   ", data, 3);
+    mcp_print_bit("TXB1CNTRL.TXREQ ", data, 4);
+    mcp_print_bit("CANINTF.TX1IF   ", data, 5);
+    mcp_print_bit("TXB2CNTRL.TXREQ ", data, 6);
+    mcp_print_bit("CANINTF.TX2IF   ", data, 7);
 }
 
 void mcp_print_rx_status (void) {
     uint8_t data = mcp_read_rx_status();
     mcp_print_bit("Rem frame ", data, 3);
     mcp_print_bit("Ext frame ", data, 4);
-    mcp_print_bit("RXB0 status ", data, 6);
-    mcp_print_bit("RXB1 status ", data, 7);
+    mcp_print_bit("RXB0 stat ", data, 6);
+    mcp_print_bit("RXB1 stat ", data, 7);
 }
 
 
 void int0_init(void) {
     /* Interrupt by raise signal */
-    regbit_set_up(EICRA, ISC00);
+    //regbit_set_up(EICRA, ISC00);
+    //regbit_set_up(EICRA, ISC01);
+
+    /* Interrupt by drop signal */
+    regbit_set_down(EICRA, ISC00);
     regbit_set_up(EICRA, ISC01);
+
     /* Set PD2 pin to input */
     regbit_set_down(DDRD, PD2);
     /* Enable external interrupt INT0 */
@@ -434,25 +457,27 @@ void int0_init(void) {
 }
 
 ISR(INT0_vect) {
+
     uint8_t reg = mcp_read_reg(CANINTF);
-    if (reg && (1 << MERRF))
-        printf("Message Error Interrupt\r\n");
-    else if (reg & (1 << WAKIF))
-        printf("Wakeup Interrupt\r\n");
-    else if (reg & (1 << ERRIF))
-        printf("Error Interrupt\r\n");
-    else if (reg & (1 << TX2IF))
-        printf("Transmit Buffer 2 Empty Interrupt\r\n");
-    else if (reg & (1 << TX1IF))
-        printf("Transmit Buffer 1 Empty Interrupt\r\n");
-    else if (reg & (1 << TX0IF))
-        printf("Transmit Buffer 0 Empty Interrupt\r\n");
-    else if (reg & (1 << RX1IF))
-        printf("Receive Buffer 1 Full Interrupt\r\n");
-    else if (reg & (1 << RX0IF))
-        printf("Receive Buffer 0 Full Interrupt\r\n");
-    else
-        printf("Dummy interrupt\r\n");
+    if (reg && (1 << MERRF));
+    if (reg & (1 << WAKIF));
+    if (reg & (1 << ERRIF));
+    if (reg & (1 << TX2IF));
+    if (reg & (1 << TX1IF));
+    if (reg & (1 << TX0IF));
+    if (reg & (1 << RX1IF));
+
+    if (reg & (1 << RX0IF)) {
+        mcp_buffer_t buffer;
+        can_msg_t msg;
+        mcp_read_rx(&buffer, 0);
+        mcp_unpack_msg(&buffer, &msg);
+        printf("len %3u: ", msg.length); 
+        for (uint8_t i = 0; i < 8; i++) 
+            printf("%3u ", msg.data[i]); 
+        printf("err count: 0x%02X", mcp_read_reg(REC));
+        printf("\r\n");
+    }
 }
 
 #define MCP_INTERRUPTS  ((1 << RX1IE) | (1 << RX0IE))
@@ -461,7 +486,7 @@ bool mcp_init(void) {
 
     mcp_reset();
     mcp_write_reg(TXRTSCTRL, 0);
-    //mcp_write_reg(CANINTE, MCP_INTERRUPTS);
+    mcp_write_reg(CANINTE, MCP_INTERRUPTS);
 
     #if 0
     spi_select_mcp();
@@ -541,18 +566,18 @@ int main() {
         //mcp_print_reg(RXB1D2);
         //mcp_print_rx(1);
 
-        printf("---BUFF:\r\n");
+        //printf("---BUFF:\r\n");
 
         ///mcp_print_buffer(&buffer);
 
-        mcp_send_msg(&msg);
-        _delay_ms(10);
-        mcp_print_rx_status();
+        //mcp_send_msg(&msg);
+        //_delay_ms(10);
+        //mcp_print_rx_status();
 
-        printf("---RX0:\r\n");
-        mcp_print_rx(0);
-        printf("---RX1:\r\n");
-        mcp_print_rx(1);
+        //printf("---RX0:\r\n");
+        //mcp_print_rx(0);
+        //printf("---RX1:\r\n");
+        //mcp_print_rx(1);
 
         while (fifo_get_token(&fifo_in, str, MAX_CMD_LEN, '\r') > 0) {
             int8_t ret_code = shell(str, shell_act, sizeof(shell_act) / sizeof(shell_act[0]));
