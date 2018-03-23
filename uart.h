@@ -6,8 +6,6 @@
 
 #include <fifo.h>
 
-//static uint8_t inbuf[FIFO_BUFFER_SIZE];
-//static uint8_t outbuf[FIFO_BUFFER_SIZE];
 
 extern fifo_t fifo_in, fifo_out;
 extern FILE uart_str;

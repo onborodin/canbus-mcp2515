@@ -281,3 +281,62 @@
 #define DLC2        2
 #define DLC1        1
 #define DLC0        0
+
+typedef struct can_msg {
+    uint32_t id;
+    uint32_t priority;
+    uint8_t length;
+    uint8_t data[8];
+} can_msg_t;
+
+typedef struct mcp_buffer {
+    uint8_t ctrl;
+    uint8_t sidh;
+    uint8_t sidl;
+    uint8_t eid8;
+    uint8_t eid0;
+    uint8_t dlc;
+    uint8_t d[8];
+} mcp_buffer_t;
+
+void spi_init(void);
+void spi_write_byte(uint8_t data);
+uint8_t spi_read_byte(void);
+
+void mcp_write_reg(uint8_t address, uint8_t data);
+uint8_t mcp_read_reg(uint8_t address);
+void mcp_modify_reg(uint8_t address, uint8_t mask, uint8_t data);
+void mcp_reg_bits_up(uint8_t address, uint8_t bits);
+void mcp_reg_bits_down(uint8_t address, uint8_t bits);
+
+void mcp_reset(void);
+void mcp_read_rx(mcp_buffer_t *buffer, uint8_t rx);
+void mcp_load_tx(mcp_buffer_t *buffer, uint8_t tx);
+
+uint8_t mcp_read_status(void);
+uint8_t mcp_read_rx_status(void);
+
+void mcp_set_mode(uint8_t mode);
+
+void mcp_pack_msg(can_msg_t *msg, mcp_buffer_t *buffer);
+void mcp_unpack_msg(mcp_buffer_t *buffer, can_msg_t *msg);
+
+int8_t mcp_find_free_tx(void);
+
+void mcp_set_tx(can_msg_t *msg, int8_t tx);
+void mcp_rts(int8_t tx);
+
+bool mcp_send_msg(can_msg_t *msg);
+
+void mcp_init(void);
+
+#if MCP_DEBUG
+void mcp_print_buffer(mcp_buffer_t *buffer);
+void mcp_print_reg(uint8_t address);
+void mcp_print_rx(uint8_t rx);
+void mcp_print_bit(uint8_t *descr, uint8_t byte, uint8_t bit);
+void mcp_print_status(void);
+void mcp_print_rx_status(void);
+#endif
+
+/* EOF */

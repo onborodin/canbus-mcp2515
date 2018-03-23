@@ -10,19 +10,21 @@
 all: main.hex
 
 CFLAGS+= -I. -Os -DF_CPU=16000000UL -mmcu=atmega328p --std=c99
-#CFLAGS+= -Wall
+CFLAGS+= -Wall
 #CFLAGS+= -save-temps
 #CFLAGS+= -fno-unwind-tables -fno-asynchronous-unwind-tables
 CFLAGS+= -ffunction-sections -fdata-sections
 #CFLAGS+= -MD -MP -MT $(*F).o -MF $(*F).d
+CFLAGS+= -ffunction-sections -fdata-sections 
 
-LDFLAGS+= -s -DF_CPU=16000000UL -mmcu=atmega328p 
+LDFLAGS+= -s -DF_CPU=16000000UL -mmcu=atmega328p
+LDFLAGS+= -Wl,--gc-sections
 #LDFLAGS+= -lm
 #LDFLAGS+= -Wl,-u,vfprintf -lprintf_flt
 
 MAIN_OBJS+= main.o fifo.o tools.o shell.o
 MAIN_OBJS+= uart.o
-#MAIN_OBJS+= mcp2515.o
+MAIN_OBJS+= mcp.o
 
 main.elf: $(MAIN_OBJS)
 	avr-gcc $(LDFLAGS) -o $@ $(^F)
