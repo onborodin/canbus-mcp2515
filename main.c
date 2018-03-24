@@ -18,8 +18,6 @@
 #include <util/twi.h>
 #include <avr/eeprom.h>
 
-#define BAUD 19200
-#include <util/setbaud.h>
 
 #include <uart.h>
 #include <fifo.h>
@@ -89,13 +87,13 @@ void int0_init(void) {
     regbit_set_up(EICRA, ISC01);
 
     /* Set PD2 pin to input */
-    regbit_set_down(DDRD, PD2);
+    //regbit_set_down(DDRD, PD2);
+    regbit_set_down(DDRD, PD3);
     /* Enable external interrupt INT0 */
     regbit_set_up(EIMSK, INT0);
 }
 
 ISR(INT0_vect) {
-
     uint8_t reg = mcp_read_reg(CANINTF);
     if (reg && (1 << MERRF));
     if (reg & (1 << WAKIF));
@@ -109,11 +107,11 @@ ISR(INT0_vect) {
         mcp_buffer_t buffer;
         can_msg_t msg;
         mcp_read_rx(&buffer, 0);
-        mcp_unpack_msg(&buffer, &msg);
-        printf("len %3u: ", msg.length); 
+        //mcp_unpack_msg(&buffer, &msg);
+        //printf("len %3u: ", msg.length); 
         for (uint8_t i = 0; i < 8; i++) 
-            printf("%3u ", msg.data[i]); 
-        printf("err count: 0x%02X", mcp_read_reg(REC));
+            printf("%3u ", buffer.d[i]); 
+        //printf("err count: 0x%02X\r\n", mcp_read_reg(REC));
         printf("\r\n");
     }
 }
@@ -146,11 +144,10 @@ int main() {
         can_msg_t msg = {
             .id = i,
             .priority = 0x01,
-            .length = 8,
+            .length = 7,
             .data = { i, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17 } 
         };
-        // now conflicted with interrupt
-        //mcp_send_msg(&msg);
+        mcp_send_msg(&msg);
         i++;
 
         while (fifo_get_token(&fifo_in, str, MAX_CMD_LEN, '\r') > 0) {

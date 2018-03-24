@@ -47,8 +47,15 @@ void spi_init(void) {
 
     /* Set SPI as master */
     regbit_set_up(SPCR, MSTR);
-    /* Set clock prescaler 1/61 */
+
+    /* Set clock prescaler 1/16 */
     regbit_set_up(SPCR, SPR0);
+    regbit_set_down(SPCR, SPR1);
+
+    /* Set clock prescaler 1/4 */
+    //regbit_set_down(SPCR, SPR0);
+    //regbit_set_down(SPCR, SPR1);
+
 
     /* Reset status register */
     reg_set_value(SPSR, 0);
@@ -56,12 +63,12 @@ void spi_init(void) {
     regbit_set_up(SPCR, SPE);
 }
 
-void spi_write_byte(uint8_t data) {
+inline void spi_write_byte(uint8_t data) {
     SPDR = data;
     while (!(SPSR & (1 << SPIF)));
 }
 
-uint8_t spi_read_byte(void) {
+inline uint8_t spi_read_byte(void) {
     SPDR = 0xFF;
     while (!(SPSR & (1 << SPIF)));
     return SPDR;
@@ -69,6 +76,14 @@ uint8_t spi_read_byte(void) {
 
 #define spi_select_mcp()   regbit_set_down(PORTB, PIN_SS)
 #define spi_unselect_mcp() regbit_set_up(PORTB, PIN_SS)
+
+inline void _spi_select_mcp(void) {
+    regbit_set_down(PORTB, PIN_SS);
+}
+
+inline void _spi_unselect_mcp(void) {
+    regbit_set_up(PORTB, PIN_SS);
+}
 
 void mcp_write_reg(uint8_t address, uint8_t data) {
     spi_select_mcp();
@@ -205,47 +220,50 @@ void mcp_set_mode(uint8_t mode) {
     mcp_write_reg(CANCTRL, reg);
 }
 
-/* CAN 2.0B Extended Message, MCP2515 Register Assignments 
- * +--------------------------------+-----------------------------------------------------+
- * | CAN Standard ID                | CAN Extended ID                                     |
- * +-----------------------+--------+-----+-----------------------+-----------------------+
- * | SIDH                  | SIDL   | SIDL| EID8                  | EID0                  |
- * +-----------------------+--------+-----+-----------------------+-----------------------+
+/* ID allocation into MCP2515:
+ * ID 10:3  SIDH: SID10 .............................  SID3
+ * ID  2:0  SIDL: SID2  SID1 SID0 SRR  IDE  XXX  EID17 EID16
+ * ID  8:19 EID8: EID15 .............................  EID8
+ * ID 18:11 EID8: EID7  .............................  EID0
  */
-
-
 void mcp_pack_msg(can_msg_t *msg, mcp_buffer_t *buffer) {
-    #define EXT_MSG 1
-    #if EXT_MSG
-    buffer->sidh = (uint8_t)(msg->id >> 3);
-    buffer->sidl = ((uint8_t)(msg->id << 5)) | (1 << EXIDE) | ((uint8_t)(msg->id >> 27) & 0x03);
-    buffer->eid8 = (uint8_t)(msg->id >> 19);
-    buffer->eid0 = (uint8_t)(msg->id >> 11);
-    #else
-    buffer->sidh = (uint8_t)(msg->id >> 3);
-    buffer->sidl = ((uint8_t)(msg->id << 5));
-    buffer->eid8 = 0x00;
-    buffer->eid0 = 0x00;
-    #endif
 
+    if (msg->exid) {
+        buffer->sidh = (uint8_t)(msg->id >> 3);
+        buffer->sidl = ((uint8_t)(msg->id << 5));
+        buffer->sidl |= ((uint8_t)(msg->id >> 27) & 0x03);
+        buffer->sidl |= (1 << EXIDE);
+
+        buffer->eid8 = (uint8_t)(msg->id >> 19);
+        buffer->eid0 = (uint8_t)(msg->id >> 11);
+    } else {
+        buffer->sidh = (uint8_t)(msg->id >> 3);
+        buffer->sidl = ((uint8_t)(msg->id << 5));
+        buffer->eid8 = 0x00;
+        buffer->eid0 = 0x00;
+    }
     for (uint8_t i = 0; i < msg->length; i++) 
         buffer->d[i] = msg->data[i];
 
     buffer->dlc = (uint8_t)(msg->length) & 0x0F;
-
 }
 
 void mcp_unpack_msg(mcp_buffer_t *buffer, can_msg_t *msg) {
-    #define EXT_MSG 1
-    #if EXT_MSG
-    msg->id =  (uint32_t)(buffer->sidh) << 3;
-    msg->id |= (uint32_t)(buffer->sidl) >> 5;
-    msg->id |= (uint32_t)(buffer->eid8) << 19;
-    msg->id |= (uint32_t)(buffer->eid0) << 11;
-    #else
-    msg->id =  (uint32_t)(buffer->sidh) << 3;
-    msg->id |= (uint32_t)(buffer->sidl) >> 5;
-    #endif
+
+    if (buffer->sidl & (1 << EXIDE)) {
+        msg->id =  (uint32_t)((buffer->sidh) << 3);
+        msg->id |= (uint32_t)(buffer->sidl) >> 5;
+
+        msg->id |= ((uint32_t)(buffer->sidl) & 0x03) << 27;
+        msg->id |= (uint32_t)(buffer->eid8) << 19;
+        msg->id |= (uint32_t)(buffer->eid0) << 11;
+        msg->exid = true;
+
+    } else {
+        msg->id =  (uint32_t)(buffer->sidh) << 3;
+        msg->id |= (uint32_t)(buffer->sidl) >> 5;
+        msg->exid = false;
+    }
 
     for (uint8_t i = 0; i < msg->length; i++) 
         msg->data[i] = buffer->d[i];
@@ -295,14 +313,35 @@ bool mcp_send_msg(can_msg_t *msg) {
 
 #define MCP_INTERRUPTS  ((1 << RX1IE) | (1 << RX0IE))
 
+#if 0
+    // 10 kbps
+    {0x04, 0xb6, 0xe7},
+    // 20 kbps
+    {0x04, 0xb6, 0xd3},
+    // 50 kbps
+    {0x04, 0xb6, 0xc7},
+    // 100 kbps
+    {0x04, 0xb6, 0xc3}, 
+    // 125 kbps
+    {(1 << PHSEG21), (1 << BTLMODE) | (1 << PHSEG11), (1 << BRP2) | (1 << BRP1) | (1 << BRP0)},
+    // 250 kbps
+    {0x03, 0xac, 0x81},
+    // 500 kbps
+    {0x03, 0xac, 0x80},
+    // 1 Mbps
+    {(1 << PHSEG21),  (1 << BTLMODE) | (1 << PHSEG11), 0}
+
+#endif
+
+
 void mcp_init(void) {
     mcp_reset();
     mcp_write_reg(TXRTSCTRL, 0);
     mcp_write_reg(CANINTE, MCP_INTERRUPTS);
 
-    mcp_write_reg(CNF3, (1 << PHSEG21));
-    mcp_write_reg(CNF2, ((1 << BTLMODE) | (1 << PHSEG11)));
     mcp_write_reg(CNF1, ((1 << BRP2) | (1 << BRP1) | (1 << BRP0)));
+    mcp_write_reg(CNF2, ((1 << BTLMODE) | (1 << PHSEG11)));
+    mcp_write_reg(CNF3, (1 << PHSEG21));
 
     //mcp_set_mode(MCP_LOOPBACK_MODE);
     mcp_set_mode(MCP_NORMAL_MODE);

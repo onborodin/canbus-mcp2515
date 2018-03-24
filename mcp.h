@@ -270,7 +270,7 @@
 
 /*
  * Bit definition of RXBnDLC (n = 0, 1)
- * TXBnDLC   (gleiche Bits)
+ * TXBnDLC
  */
 #define RTR         6
 #define DLC3        3
@@ -280,6 +280,7 @@
 
 typedef struct can_msg {
     uint32_t id;
+    bool exid;
     uint32_t priority;
     uint8_t length;
     uint8_t data[8];

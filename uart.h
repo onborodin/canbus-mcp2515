@@ -6,7 +6,6 @@
 
 #include <fifo.h>
 
-
 extern fifo_t fifo_in, fifo_out;
 extern FILE uart_str;
 

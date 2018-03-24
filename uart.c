@@ -18,7 +18,7 @@
 #include <util/twi.h>
 #include <avr/eeprom.h>
 
-#define BAUD 19200
+#define BAUD 38400
 #include <util/setbaud.h>
 
 #include <fifo.h>
