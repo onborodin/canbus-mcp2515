@@ -93,6 +93,9 @@ void int0_init(void) {
     regbit_set_up(EIMSK, INT0);
 }
 
+uint32_t rx_count0 = 0;
+uint32_t rx_count1 = 0;
+
 ISR(INT0_vect) {
     uint8_t reg = mcp_read_reg(CANINTF);
     if (reg && (1 << MERRF));
@@ -101,18 +104,21 @@ ISR(INT0_vect) {
     if (reg & (1 << TX2IF));
     if (reg & (1 << TX1IF));
     if (reg & (1 << TX0IF));
-    if (reg & (1 << RX1IF));
+
+    if (reg & (1 << RX1IF)) {
+        mcp_buffer_t buffer;
+        mcp_read_rx(&buffer, 0);
+        rx_count1++;
+    }
 
     if (reg & (1 << RX0IF)) {
         mcp_buffer_t buffer;
-        can_msg_t msg;
         mcp_read_rx(&buffer, 0);
-        //mcp_unpack_msg(&buffer, &msg);
-        //printf("len %3u: ", msg.length); 
-        for (uint8_t i = 0; i < 8; i++) 
-            printf("%3u ", buffer.d[i]); 
-        //printf("err count: 0x%02X\r\n", mcp_read_reg(REC));
-        printf("\r\n");
+        rx_count0++;
+        //for (uint8_t i = 0; i < 8; i++)
+        //        fifo_putc(&fifo_out, buffer.d[i]);
+        //fifo_putc(&fifo_out, '\r');
+        //fifo_putc(&fifo_out, '\n');
     }
 }
 
@@ -132,31 +138,34 @@ int main() {
     printf(prompt);
 
     spi_init();
-    mcp_init();
+
+    mcp_init(MCP_NORMAL_MODE, MCP_BR_125KB_CNF);
 
     sei();
 
     mcp_buffer_t buffer;
     uint8_t i = 0;
 
+    can_msg_t msg = {
+        .id = 0x123,
+        .priority = 0x01,
+        .length = 8,
+        .data = { 'Q', 'W', 'E', 'R', 'T', 'Y', '1', '2' } 
+    };
+
     while (1) {
-
-        can_msg_t msg = {
-            .id = i,
-            .priority = 0x01,
-            .length = 7,
-            .data = { i, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17 } 
-        };
-        mcp_send_msg(&msg);
-        i++;
-
+        printf("%8lX %8lX\r\n", rx_count0, rx_count1);
+        for (uint8_t i = 0; i < 20; i++) {
+        //    mcp_send_msg(&msg);
+            _delay_ms(50);
+        }
         while (fifo_get_token(&fifo_in, str, MAX_CMD_LEN, '\r') > 0) {
             int8_t ret_code = shell(str, shell_act, sizeof(shell_act) / sizeof(shell_act[0]));
             if (ret_code == SH_CMD_NOTFND)
                 printf("COMMAND NOT FOUND\r\n");
             printf(prompt);
         }
-        _delay_ms(500);
+        _delay_ms(100);
     }
 }
 /* EOF */

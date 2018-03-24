@@ -1,4 +1,6 @@
-/* $Id$ */
+/*
+ * Copyright 2018 Borodin Oleg <onborodin@gmail.com>
+ */
 
 /* MCP commands */
 #define MCP_CMD_RESET         0xC0
@@ -297,6 +299,23 @@ typedef struct mcp_buffer {
 
 } mcp_buffer_t;
 
+
+#define MCP_BR_5KB_CNF     (1 << SJW1) | (1 << BRP4) | (1 << BRP3) | (1 << BRP2) | (1 << BRP1) | (1 << BRP0)
+#define MCP_BR_10KB_CNF    (1 << SJW0) | (1 << BRP3) | (1 << BRP2) | (1 << BRP1) | (1 << BRP0)
+#define MCP_BR_20KB_CNF    (1 << SJW1) | (1 << BRP5) | (1 << BRP2) | (1 << BRP1) | (1 << BRP0)
+#define MCP_BR_50KB_CNF    (1 << BRP3) | (1 << BRP2) | (1 << BRP1) | (1 << BRP0)
+#define MCP_BR_125KB_CNF   (1 << SJW1) | (1 << BRP4) | (1 << BRP3) | (1 << BRP2) | (1 << BRP1) | (1 << BRP0)
+#define MCP_BR_250KB_CNF   (1 << SJW1) | (1 << SJW0) | (1 << BRP3) | (1 << BRP2) | (1 << BRP1) | (1 << BRP0)
+#define MCP_BR_500KB_CNF   (1 << SJW1) | (1 << SJW0) | (1 << BRP5) | (1 << BRP2) | (1 << BRP1) | (1 << BRP0)
+#define MCP_BR_1000KB_CNF  (1 << SJW1) | (1 << SJW0) | (1 << BRP5) | (1 << BRP4) | (1 << BRP1) | (1 << BRP0)
+
+#define MCP_NORMAL_MODE     0x00    /* 000 = Set Normal Operation mode */
+#define MCP_SLEEP_MODE      0x20    /* 001 = Set Sleep mode */
+#define MCP_LOOPBACK_MODE   0x40    /* 010 = Set Loopback mode */
+#define MCP_LISTEN_MODE     0x60    /* 011 = Set Listen-only mode */
+#define MCP_CONF_MODE       0x80    /* 100 = Set Configuration mode */
+
+
 void spi_init(void);
 void spi_write_byte(uint8_t data);
 uint8_t spi_read_byte(void);
@@ -326,7 +345,7 @@ void mcp_rts(int8_t tx);
 
 bool mcp_send_msg(can_msg_t *msg);
 
-void mcp_init(void);
+void mcp_init(uint8_t mode, uint8_t rate_cnf);
 
 #if MCP_DEBUG
 void mcp_print_buffer(mcp_buffer_t *buffer);

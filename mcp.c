@@ -1,5 +1,6 @@
-
-/* $Id$ */
+/*
+ * Copyright 2018 Borodin Oleg <onborodin@gmail.com>
+ */
 
 #include <ctype.h>
 #include <stdint.h>
@@ -55,7 +56,6 @@ void spi_init(void) {
     /* Set clock prescaler 1/4 */
     //regbit_set_down(SPCR, SPR0);
     //regbit_set_down(SPCR, SPR1);
-
 
     /* Reset status register */
     reg_set_value(SPSR, 0);
@@ -204,13 +204,6 @@ uint8_t mcp_read_rx_status(void) {
     return data;
 }
 
-//#define MCP_LOOPBACK_MODE   (1 << REQOP1)
-#define MCP_NORMAL_MODE     0x00    //000 = Set Normal Operation mode
-#define MCP_SLEEP_MODE      0x20    //001 = Set Sleep mode
-#define MCP_LOOPBACK_MODE   0x40    //010 = Set Loopback mode
-#define MCP_LISTEN_MODE     0x60    //011 = Set Listen-only mode
-#define MCP_CONF_MODE       0x80    //100 = Set Configuration mode
-
 void mcp_set_mode(uint8_t mode) {
     uint8_t reg = mcp_read_reg(CANCTRL);
     /* Mask mode bits */
@@ -333,18 +326,16 @@ bool mcp_send_msg(can_msg_t *msg) {
 
 #endif
 
-
-void mcp_init(void) {
+void mcp_init(uint8_t mode, uint8_t rate_cnf) {
     mcp_reset();
     mcp_write_reg(TXRTSCTRL, 0);
     mcp_write_reg(CANINTE, MCP_INTERRUPTS);
 
-    mcp_write_reg(CNF1, ((1 << BRP2) | (1 << BRP1) | (1 << BRP0)));
+    mcp_write_reg(CNF1, rate_cnf);
     mcp_write_reg(CNF2, ((1 << BTLMODE) | (1 << PHSEG11)));
     mcp_write_reg(CNF3, (1 << PHSEG21));
 
-    //mcp_set_mode(MCP_LOOPBACK_MODE);
-    mcp_set_mode(MCP_NORMAL_MODE);
+    mcp_set_mode(mode);
 }
 
 #if MCP_DEBUG
