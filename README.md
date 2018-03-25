@@ -2,11 +2,22 @@
 
 # Sample CAN bus MCP2515 driver
 
-
-I wrote this code from scratch, based on documentation.
-
+I wrote this code from scratch, based on documentation and some recomendation.
 
 ## Usage
+
+### Initialize
+
+    #include <mcp.h>
+
+    int main (void) {
+        ...
+        spi_init();
+        mcp_init(MCP_NORMAL_MODE, MCP_BR_125KB_CNF);
+        ...
+    }
+
+You can use other mode, loopback or listen-only. See mcp.h
 
 ### Send message
 
@@ -16,6 +27,7 @@ I wrote this code from scratch, based on documentation.
     msg.exid = true,
     msg.data[0] = 0x12;
     msg.data[1] = 0x34;
+    msg.length = 2;
 
     mcp_send_msg(&msg);
 
