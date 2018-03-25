@@ -1,6 +1,10 @@
+
 /*
- * Copyright 2018 Borodin Oleg <onborodin@gmail.com>
+ * Copyright 2018 Oleg Borodin <onborodin@gmail.com>
  */
+
+#ifndef MCP_H_ITU
+#define MCP_H_ITU
 
 /* MCP commands */
 #define MCP_CMD_RESET         0xC0
@@ -285,7 +289,11 @@ typedef struct can_msg {
     bool exid;
     uint32_t priority;
     uint8_t length;
-    uint8_t data[8];
+    union {
+        uint8_t data[8];
+        uint16_t word[4];
+        uint32_t dword[2];
+    };
 } can_msg_t;
 
 typedef struct mcp_buffer {
@@ -354,6 +362,8 @@ void mcp_print_rx(uint8_t rx);
 void mcp_print_bit(uint8_t *descr, uint8_t byte, uint8_t bit);
 void mcp_print_status(void);
 void mcp_print_rx_status(void);
+#endif
+
 #endif
 
 /* EOF */

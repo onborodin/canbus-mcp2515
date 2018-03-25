@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Borodin Oleg <onborodin@gmail.com>
+ * Copyright 2018 Oleg Borodin <onborodin@gmail.com>
  */
 
 #include <ctype.h>
@@ -18,6 +18,7 @@
 #include <util/delay.h>
 #include <util/twi.h>
 #include <avr/eeprom.h>
+#include <util/atomic.h>
 
 #include <mcp.h>
 
@@ -74,36 +75,43 @@ inline uint8_t spi_read_byte(void) {
     return SPDR;
 }
 
-#define spi_select_mcp()   regbit_set_down(PORTB, PIN_SS)
-#define spi_unselect_mcp() regbit_set_up(PORTB, PIN_SS)
+//#define spi_select_mcp()   regbit_set_down(PORTB, PIN_SS)
+//#define spi_unselect_mcp() regbit_set_up(PORTB, PIN_SS)
 
-inline void _spi_select_mcp(void) {
+inline void spi_select_mcp(void) {
     regbit_set_down(PORTB, PIN_SS);
 }
 
-inline void _spi_unselect_mcp(void) {
+inline void spi_unselect_mcp(void) {
     regbit_set_up(PORTB, PIN_SS);
 }
 
+
+
+
 void mcp_write_reg(uint8_t address, uint8_t data) {
-    spi_select_mcp();
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        spi_select_mcp();
 
-    spi_write_byte(MCP_CMD_WRITE);
-    spi_write_byte(address);
-    spi_write_byte(data);
+        spi_write_byte(MCP_CMD_WRITE);
+        spi_write_byte(address);
+        spi_write_byte(data);
 
-    spi_unselect_mcp();
+        spi_unselect_mcp();
+    }
 }
 
 uint8_t mcp_read_reg(uint8_t address) {
     uint8_t data;
-    spi_select_mcp();
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        spi_select_mcp();
 
-    spi_write_byte(MCP_CMD_READ);
-    spi_write_byte(address);
-    data = spi_read_byte();
+        spi_write_byte(MCP_CMD_READ);
+        spi_write_byte(address);
+        data = spi_read_byte();
 
-    spi_unselect_mcp();
+        spi_unselect_mcp();
+    }
     return data;
 }
 
@@ -130,7 +138,6 @@ void mcp_reg_bits_down(uint8_t address, uint8_t bits) {
     mcp_write_reg(address, reg);
 }
 
-
 void mcp_reset(void) {
     spi_select_mcp();
     spi_write_byte(MCP_CMD_RESET);
@@ -142,65 +149,74 @@ void mcp_reset(void) {
 void mcp_read_rx(mcp_buffer_t *buffer, uint8_t rx) {
 
     uint8_t rx_cmd_read[] = { MCP_CMD_READ_RX0, MCP_CMD_READ_RX1 };
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        spi_select_mcp();
 
-    spi_select_mcp();
+        spi_write_byte(rx_cmd_read[rx]);
+        buffer->sidh = spi_read_byte();
+        buffer->sidl = spi_read_byte();
+        buffer->eid8 = spi_read_byte();
+        buffer->eid0 = spi_read_byte();
+        buffer->dlc = spi_read_byte();
 
-    spi_write_byte(rx_cmd_read[rx]);
-    buffer->sidh = spi_read_byte();
-    buffer->sidl = spi_read_byte();
-    buffer->eid8 = spi_read_byte();
-    buffer->eid0 = spi_read_byte();
-    buffer->dlc = spi_read_byte();
+        buffer->d[0]  = spi_read_byte();
+        buffer->d[1]  = spi_read_byte();
+        buffer->d[2]  = spi_read_byte();
+        buffer->d[3]  = spi_read_byte();
+        buffer->d[4]  = spi_read_byte();
+        buffer->d[5]  = spi_read_byte();
+        buffer->d[6]  = spi_read_byte();
+        buffer->d[7]  = spi_read_byte();
 
-    buffer->d[0]  = spi_read_byte();
-    buffer->d[1]  = spi_read_byte();
-    buffer->d[2]  = spi_read_byte();
-    buffer->d[3]  = spi_read_byte();
-    buffer->d[4]  = spi_read_byte();
-    buffer->d[5]  = spi_read_byte();
-    buffer->d[6]  = spi_read_byte();
-    buffer->d[7]  = spi_read_byte();
-
-    spi_unselect_mcp();
+        spi_unselect_mcp();
+    }
 }
 
 void mcp_load_tx(mcp_buffer_t *buffer, uint8_t tx) {
 
     uint8_t tx_write_cmd[TX_BUF_COUNT] = { MCP_CMD_WRITE_TX0, MCP_CMD_WRITE_TX1, MCP_CMD_WRITE_TX2 };
-    spi_select_mcp();
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        spi_select_mcp();
 
-    spi_write_byte(tx_write_cmd[tx]);
+        spi_write_byte(tx_write_cmd[tx]);
 
-    spi_write_byte(buffer->sidh);
-    spi_write_byte(buffer->sidl);
-    spi_write_byte(buffer->eid8);
-    spi_write_byte(buffer->eid0);
-    spi_write_byte(buffer->dlc);
-    spi_write_byte(buffer->d[0]);
-    spi_write_byte(buffer->d[1]);
-    spi_write_byte(buffer->d[2]);
-    spi_write_byte(buffer->d[3]);
-    spi_write_byte(buffer->d[4]);
-    spi_write_byte(buffer->d[5]);
-    spi_write_byte(buffer->d[6]);
-    spi_write_byte(buffer->d[7]);
+        spi_write_byte(buffer->sidh);
+        spi_write_byte(buffer->sidl);
+        spi_write_byte(buffer->eid8);
+        spi_write_byte(buffer->eid0);
+        spi_write_byte(buffer->dlc);
+        spi_write_byte(buffer->d[0]);
+        spi_write_byte(buffer->d[1]);
+        spi_write_byte(buffer->d[2]);
+        spi_write_byte(buffer->d[3]);
+        spi_write_byte(buffer->d[4]);
+        spi_write_byte(buffer->d[5]);
+        spi_write_byte(buffer->d[6]);
+        spi_write_byte(buffer->d[7]);
 
-    spi_unselect_mcp();
+        spi_unselect_mcp();
+    }
 }
 
 uint8_t mcp_read_status(void) {
-    spi_select_mcp();
-    spi_write_byte(MCP_CMD_GET_READ_STATUS);
-    uint8_t data = spi_read_byte();
-    spi_unselect_mcp();
+    uint8_t data;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        spi_select_mcp();
+        spi_write_byte(MCP_CMD_GET_READ_STATUS);
+        data = spi_read_byte();
+        spi_unselect_mcp();
+    }
     return data;
 }
 
 uint8_t mcp_read_rx_status(void) {
-    spi_select_mcp();
-    spi_write_byte(MCP_CMD_GET_RX_STATUS);
-    uint8_t data = spi_read_byte();
-    spi_unselect_mcp();
+    uint8_t data;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        spi_select_mcp();
+        spi_write_byte(MCP_CMD_GET_RX_STATUS);
+        data = spi_read_byte();
+        spi_unselect_mcp();
+    }
     return data;
 }
 
@@ -284,9 +300,11 @@ void mcp_set_tx(can_msg_t *msg, int8_t tx) {
 
 void mcp_rts(int8_t tx) {
     uint8_t tx_rts_cmd[TX_BUF_COUNT] = { MCP_CMD_RTS_TX0, MCP_CMD_RTS_TX1, MCP_CMD_RTS_TX2 };
-    spi_select_mcp();
-    spi_write_byte(tx_rts_cmd[tx]);
-    spi_unselect_mcp();
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        spi_select_mcp();
+        spi_write_byte(tx_rts_cmd[tx]);
+        spi_unselect_mcp();
+    }
 }
 
 bool mcp_send_msg(can_msg_t *msg) {
@@ -305,26 +323,6 @@ bool mcp_send_msg(can_msg_t *msg) {
 }
 
 #define MCP_INTERRUPTS  ((1 << RX1IE) | (1 << RX0IE))
-
-#if 0
-    // 10 kbps
-    {0x04, 0xb6, 0xe7},
-    // 20 kbps
-    {0x04, 0xb6, 0xd3},
-    // 50 kbps
-    {0x04, 0xb6, 0xc7},
-    // 100 kbps
-    {0x04, 0xb6, 0xc3}, 
-    // 125 kbps
-    {(1 << PHSEG21), (1 << BTLMODE) | (1 << PHSEG11), (1 << BRP2) | (1 << BRP1) | (1 << BRP0)},
-    // 250 kbps
-    {0x03, 0xac, 0x81},
-    // 500 kbps
-    {0x03, 0xac, 0x80},
-    // 1 Mbps
-    {(1 << PHSEG21),  (1 << BTLMODE) | (1 << PHSEG11), 0}
-
-#endif
 
 void mcp_init(uint8_t mode, uint8_t rate_cnf) {
     mcp_reset();

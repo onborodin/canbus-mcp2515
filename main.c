@@ -156,7 +156,7 @@ int main() {
     while (1) {
         printf("%8lX %8lX\r\n", rx_count0, rx_count1);
         for (uint8_t i = 0; i < 20; i++) {
-        //    mcp_send_msg(&msg);
+            mcp_send_msg(&msg);
             _delay_ms(50);
         }
         while (fifo_get_token(&fifo_in, str, MAX_CMD_LEN, '\r') > 0) {
