@@ -4,6 +4,35 @@
 
 I wrote this code from scratch, based on documentation and some recomendation.
 
+Central object is abstract CAN bus message
+
+    typedef struct can_msg {
+        uint32_t id;
+        bool exid;
+        uint32_t priority;
+        uint8_t length;
+        union {
+            uint8_t data[8];
+            uint16_t word[4];
+            uint32_t dword[2];
+        };
+    } can_msg_t;
+
+An auxiliary object is a structure that maps structure of the chip registers
+
+    typedef struct mcp_buffer {
+        uint8_t sidh;
+        uint8_t sidl;
+        uint8_t eid8;
+        uint8_t eid0;
+        uint8_t dlc;
+        uint8_t d[8];
+    } mcp_buffer_t;
+
+Of course, is possible to write directly to registers for speed,
+but the introduction mcp_buffer_t object makes debugging
+more easier.
+
 ## Usage
 
 ### Initialize
@@ -23,11 +52,12 @@ You can use other mode, loopback or listen-only. See mcp.h
 
     can_msg_t msg;
 
-    msg.id = 0x12345,
-    msg.exid = true,
+    msg.id = 0x1234;
+    msg.exid = true;
     msg.data[0] = 0x12;
     msg.data[1] = 0x34;
     msg.length = 2;
+    msg.priority = 0;
 
     mcp_send_msg(&msg);
 
@@ -73,7 +103,8 @@ Or
 
 ### No guarantees. This code is given only as an example
 
-
+I have not written management of ID filters & masks.
+I'll write it if necessary.
 
 
 
